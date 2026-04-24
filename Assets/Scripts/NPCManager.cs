@@ -1,17 +1,16 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class NPCManager : MonoBehaviour
 {
-    public List<Rigidbody> rigidbodies = new List<Rigidbody>();
+    public System.Collections.Generic.List<Rigidbody> rigidbodies = new System.Collections.Generic.List<Rigidbody>();
+
     public void Fall()
     {
         GetComponent<Animator>().enabled = false;
-        foreach (var rigidbody in rigidbodies)
+        foreach (var rb in rigidbodies)
         {
-            rigidbody.drag = 1f;
-            rigidbody.velocity = Vector3.zero;
+            rb.drag = 1f;
+            rb.velocity = Vector3.zero;
         }
     }
 }

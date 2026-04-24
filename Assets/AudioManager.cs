@@ -1,116 +1,116 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-//音频管理器
+
+// Singleton audio manager providing an 8-channel pooled playback system.
 public class AudioManager : MonoBehaviour
 {
     public static AudioManager instance;
-    // 整个游戏中，总的音源数量
+
     private const int AUDIO_CHANNEL_NUM = 8;
-    private struct CHANNEL
+
+    private struct Channel
     {
-        public AudioSource channel;
-        public float keyOnTime; //记录最近一次播放音乐的时刻
-    };
-    private CHANNEL[] m_channels;
+        public AudioSource source;
+        public float keyOnTime; // Timestamp of the most recent play call on this channel
+    }
+
+    private Channel[] m_channels;
 
     void Awake()
     {
-        if(instance==null)
+        if (instance == null)
         {
             instance = this;
             DontDestroyOnLoad(gameObject);
         }
-            
         else
+        {
             Destroy(gameObject);
-        m_channels = new CHANNEL[AUDIO_CHANNEL_NUM];
+            return;
+        }
+
+        m_channels = new Channel[AUDIO_CHANNEL_NUM];
         for (int i = 0; i < AUDIO_CHANNEL_NUM; i++)
         {
-            
-            m_channels[i].channel = gameObject.AddComponent<AudioSource>();
-            m_channels[i].keyOnTime = 0;
+            m_channels[i].source = gameObject.AddComponent<AudioSource>();
+            m_channels[i].keyOnTime = 0f;
         }
     }
 
+    // Plays a one-shot clip. Prevents double-triggering the same clip within 30ms.
+    // Returns the channel index used, or -1 if playback was skipped.
     public int PlayOneShot(AudioClip clip, float volume, float pitch = 1.0f)
     {
         for (int i = 0; i < m_channels.Length; i++)
         {
-            
-            if (m_channels[i].channel.isPlaying &&
-                 m_channels[i].channel.clip == clip &&
-                 m_channels[i].keyOnTime >= Time.time - 0.03f)
+            if (m_channels[i].source.isPlaying &&
+                m_channels[i].source.clip == clip &&
+                m_channels[i].keyOnTime >= Time.time - 0.03f)
                 return -1;
         }
 
         int oldest = -1;
-        float time = 10000000.0f;
+        float oldestTime = float.MaxValue;
+
         for (int i = 0; i < m_channels.Length; i++)
         {
-            if (m_channels[i].channel.loop == false &&
-               m_channels[i].channel.isPlaying &&
-               m_channels[i].keyOnTime < time)
+            if (!m_channels[i].source.isPlaying)
             {
-                oldest = i;
-                time = m_channels[i].keyOnTime;
-            }
-            if (!m_channels[i].channel.isPlaying)
-            {
-                m_channels[i].channel.clip = clip;
-                m_channels[i].channel.volume = volume;
-                m_channels[i].channel.pitch = pitch;
-                m_channels[i].channel.loop = false;
-                m_channels[i].channel.Play();
-                m_channels[i].keyOnTime = Time.time;
+                PlayOnChannel(i, clip, volume, pitch, false);
                 return i;
             }
+
+            if (!m_channels[i].source.loop && m_channels[i].keyOnTime < oldestTime)
+            {
+                oldest = i;
+                oldestTime = m_channels[i].keyOnTime;
+            }
         }
-        //运行到这里说明没有空闲频道。让新的音频顶替最早播出的音频
+
+        // No free channel — evict the oldest non-looping one
         if (oldest >= 0)
         {
-            m_channels[oldest].channel.clip = clip;
-            m_channels[oldest].channel.volume = volume;
-            m_channels[oldest].channel.pitch = pitch;
-            m_channels[oldest].channel.loop = false;
-            m_channels[oldest].channel.Play();
-            m_channels[oldest].keyOnTime = Time.time;
+            PlayOnChannel(oldest, clip, volume, pitch, false);
             return oldest;
         }
+
         return -1;
     }
-    //公开方法：循环播放，用于播放长时间的背景音乐，处理方式相对简单一些
+
+    // Plays a looping clip (e.g. background music). Returns the channel index, or -1 if all channels are busy.
     public int PlayLoop(AudioClip clip, float volume, float pan, float pitch = 1.0f)
     {
         for (int i = 0; i < m_channels.Length; i++)
         {
-            if (!m_channels[i].channel.isPlaying)
+            if (!m_channels[i].source.isPlaying)
             {
-                m_channels[i].channel.clip = clip;
-                m_channels[i].channel.volume = volume;
-                m_channels[i].channel.pitch = pitch;
-                m_channels[i].channel.panStereo = pan;
-                m_channels[i].channel.loop = true;
-                m_channels[i].channel.Play();
-                m_channels[i].keyOnTime = Time.time;
+                m_channels[i].source.panStereo = pan;
+                PlayOnChannel(i, clip, volume, pitch, true);
                 return i;
             }
         }
+
         return -1;
     }
 
-    //公开方法：停止所有音频
     public void StopAll()
     {
-        foreach (CHANNEL channel in m_channels)
-            channel.channel.Stop();
+        foreach (Channel channel in m_channels)
+            channel.source.Stop();
     }
-    //公开方法：根据频道ID停止音频
+
     public void Stop(int id)
     {
         if (id >= 0 && id < m_channels.Length)
-        {
-            m_channels[id].channel.Stop();
-        }
+            m_channels[id].source.Stop();
+    }
+
+    private void PlayOnChannel(int index, AudioClip clip, float volume, float pitch, bool loop)
+    {
+        m_channels[index].source.clip = clip;
+        m_channels[index].source.volume = volume;
+        m_channels[index].source.pitch = pitch;
+        m_channels[index].source.loop = loop;
+        m_channels[index].source.Play();
+        m_channels[index].keyOnTime = Time.time;
     }
 }

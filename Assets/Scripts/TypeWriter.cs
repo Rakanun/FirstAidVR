@@ -1,89 +1,86 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
 
 public class TypeWriter : MonoBehaviour
 {
-    public AudioClip audioClip;
     public static TypeWriter instance;
-    public float Speed = 15;
-    [HideInInspector] public bool iswritting;
+
+    public AudioClip audioClip;
+    public float Speed = 15f;
+
+    [HideInInspector] public bool isWriting;
+
     private void Awake()
     {
-        instance = this;
+        if (instance == null)
+            instance = this;
+        else
+            Destroy(gameObject);
     }
-    public void Run(string textToType, Text textLabel, UnityAction EndEvent = null)
+
+    public void Run(string textToType, Text textLabel, UnityAction endEvent = null)
     {
         StopAllCoroutines();
-        StartCoroutine(TypeText(textToType, textLabel, EndEvent));
-        iswritting = true;
+        StartCoroutine(TypeText(textToType, textLabel, endEvent));
+        isWriting = true;
     }
-    IEnumerator TypeText(string textToType, Text textLabel, UnityAction EndEvent)
+
+    IEnumerator TypeText(string textToType, Text textLabel, UnityAction endEvent)
     {
-        float t = 0;
+        float t = 0f;
         int charIndex = 0;
-        string processedText = "";
-        int i=AudioManager.instance.PlayLoop(audioClip, 0.5f,0);
-        
+
+        int audioChannel = -1;
+        if (AudioManager.instance != null)
+            audioChannel = AudioManager.instance.PlayLoop(audioClip, 0.5f, 0f);
+
         while (charIndex < textToType.Length)
         {
             t += Time.deltaTime * Speed;
-            charIndex = Mathf.FloorToInt(t);
-            charIndex = Mathf.Clamp(charIndex, 0, textToType.Length);
-
-
-            processedText = ProcessText(textToType.Substring(0, charIndex));
-            textLabel.text = processedText;
-
+            charIndex = Mathf.Clamp(Mathf.FloorToInt(t), 0, textToType.Length);
+            textLabel.text = ProcessText(textToType.Substring(0, charIndex));
             yield return null;
         }
 
+        textLabel.text = ProcessText(textToType);
+        endEvent?.Invoke();
 
-        processedText = ProcessText(textToType);
-        textLabel.text = processedText;
-        EndEvent?.Invoke();
-
-        iswritting = false;
-        AudioManager.instance.Stop(i);
+        isWriting = false;
+        if (AudioManager.instance != null)
+            AudioManager.instance.Stop(audioChannel);
     }
+
+    // Wraps text between @ markers in yellow rich-text color tags.
     private string ProcessText(string inputText)
     {
         string result = "";
-        bool inRedSection = false;
+        bool inHighlight = false;
         int startIndex = 0;
 
         for (int i = 0; i < inputText.Length; i++)
         {
-            if (inputText[i] == '@')
+            if (inputText[i] != '@')
+                continue;
+
+            if (inHighlight)
             {
-                if (inRedSection)
-                {
-
-                    result += "<color=yellow>" + inputText.Substring(startIndex, i - startIndex) + "</color>";
-                    startIndex = i + 1;
-                    inRedSection = false;
-                }
-                else
-                {
-
-                    result += inputText.Substring(startIndex, i - startIndex);
-                    startIndex = i + 1;
-                    inRedSection = true;
-                }
+                result += "<color=yellow>" + inputText.Substring(startIndex, i - startIndex) + "</color>";
+                inHighlight = false;
             }
+            else
+            {
+                result += inputText.Substring(startIndex, i - startIndex);
+                inHighlight = true;
+            }
+
+            startIndex = i + 1;
         }
 
-
-        if (inRedSection)
-        {
-            result += "<color=yellow>" + inputText.Substring(startIndex) + "</color>";
-        }
-        else
-        {
-            result += inputText.Substring(startIndex);
-        }
+        result += inHighlight
+            ? "<color=yellow>" + inputText.Substring(startIndex) + "</color>"
+            : inputText.Substring(startIndex);
 
         return result;
     }

@@ -1,9 +1,9 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-public class HnadAnimationController : MonoBehaviour
+
+public class HandAnimationController : MonoBehaviour
 {
-    Animator animator;
+    private Animator animator;
+
     public OVRInput.RawButton handTypeGrab;
     public OVRInput.RawButton handTypePoint;
 
@@ -12,7 +12,6 @@ public class HnadAnimationController : MonoBehaviour
         animator = GetComponent<Animator>();
     }
 
-    // Update is called once per frame
     void Update()
     {
         if (OVRInput.GetDown(handTypeGrab))

@@ -1,15 +1,15 @@
 Shader "Custom/PositionHighlight"
 {
-Properties
+    Properties
     {
-        _MainTex ("基础纹理", 2D) = "white" {}
-        _HighlightColor ("高亮颜色", Color) = (1,0.5,0.5,1)
-        _HighlightCenter ("高亮中心", Vector) = (0,0,0,0)
-        _HighlightRadius ("影响半径", Range(0.1, 5)) = 1.0
-        _ColorIntensity ("颜色强度", Range(0, 2)) = 1.0
-        _EdgeSmoothness ("边缘平滑", Range(0, 1)) = 0.2       
-        _DeformationDepth ("凹陷深度", Range(0, 0.3)) = 0.1
-        _DeformationHardness ("形变硬度", Range(0.1, 5)) = 2.0
+        _MainTex ("Base Texture", 2D) = "white" {}
+        _HighlightColor ("Highlight Color", Color) = (1,0.5,0.5,1)
+        _HighlightCenter ("Highlight Center", Vector) = (0,0,0,0)
+        _HighlightRadius ("Influence Radius", Range(0.1, 5)) = 1.0
+        _ColorIntensity ("Color Intensity", Range(0, 2)) = 1.0
+        _EdgeSmoothness ("Edge Smoothness", Range(0, 1)) = 0.2
+        _DeformationDepth ("Deformation Depth", Range(0, 0.3)) = 0.1
+        _DeformationHardness ("Deformation Hardness", Range(0.1, 5)) = 2.0
     }
 
     SubShader
@@ -36,47 +36,42 @@ Properties
             float3 worldPos;
         };
 
-        // 顶点着色器：实现按压变形
+        // Vertex shader: applies press deformation along vertex normals
         void vert(inout appdata_full v, out Input o)
         {
             UNITY_INITIALIZE_OUTPUT(Input, o);
-            
-            // 计算世界空间到模型空间的转换
+
+            // Transform highlight center from world space to object space
             float3 centerOS = mul(unity_WorldToObject, float4(_HighlightCenter, 1)).xyz;
-            
-            // 计算顶点到中心的距离
-            float distance = length(v.vertex.xyz - centerOS);
-            
-            // 形变衰减计算（指数衰减曲线）
-            float attenuation = pow(saturate(1 - distance / _HighlightRadius), _DeformationHardness);
-            
-            // 沿法线方向凹陷
+
+            float dist = length(v.vertex.xyz - centerOS);
+
+            // Exponential falloff curve for smooth deformation boundary
+            float attenuation = pow(saturate(1 - dist / _HighlightRadius), _DeformationHardness);
+
+            // Indent vertices along their normals
             float3 deformation = v.normal * _DeformationDepth * attenuation;
             v.vertex.xyz -= deformation;
         }
 
-        // 表面着色器：处理颜色混合
-        void surf (Input IN, inout SurfaceOutputStandard o)
+        // Surface shader: blends base texture with highlight color
+        void surf(Input IN, inout SurfaceOutputStandard o)
         {
-            // 基础纹理采样
             fixed4 baseColor = tex2D(_MainTex, IN.uv_MainTex);
-            
-            // 高亮强度计算
+
             float distanceToCenter = distance(IN.worldPos, _HighlightCenter);
             float highlightFactor = 1 - smoothstep(
                 _HighlightRadius * (1 - _EdgeSmoothness),
                 _HighlightRadius,
                 distanceToCenter
             );
-            
-            // 颜色混合
+
             float3 blendedColor = lerp(
                 baseColor.rgb,
                 _HighlightColor.rgb * _ColorIntensity,
                 highlightFactor * _HighlightColor.a
             );
 
-            // 输出参数
             o.Albedo = blendedColor;
             o.Metallic = 0;
             o.Smoothness = 0.5;
