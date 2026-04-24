@@ -3,22 +3,22 @@ using UnityEngine;
 [RequireComponent(typeof(Renderer))]
 public class HighlightController : MonoBehaviour
 {
-    [Header("高亮设置")]
-    public Color highlightColor = new Color(1, 1, 0.5f, 1);
+    [Header("Highlight Settings")]
+    public Color highlightColor = new Color(1f, 1f, 0.5f, 1f);
     public float highlightRadius = 1.0f;
     public float intensity = 2.0f;
     public float smoothness = 0.2f;
 
-    [Header("变形设置")]
-    [Range(0, 0.3f)] public float deformationDepth = 0.1f;
+    [Header("Deformation Settings")]
+    [Range(0f, 0.3f)] public float deformationDepth = 0.1f;
     [Range(0.1f, 5f)] public float deformationHardness = 2f;
 
-    [Header("状态控制")]
+    [Header("State")]
     public Transform highlightCenter;
 
     private Material _material;
+    private bool _isHighlighting;
 
-    // 初始状态存储
     private Color _initialColor;
     private float _initialRadius;
     private float _initialIntensity;
@@ -26,11 +26,9 @@ public class HighlightController : MonoBehaviour
     private float _initialDeformationDepth;
     private float _initialDeformationHardness;
 
-    private bool _isHighlighting = false;
-
     void Start()
     {
-        InitializeMaterial();
+        _material = GetComponent<Renderer>().materials[0];
         SaveInitialStates();
         UpdateMaterialProperties();
     }
@@ -40,24 +38,18 @@ public class HighlightController : MonoBehaviour
         SetDeformation(deformationDepth, deformationHardness);
         if (_isHighlighting)
         {
-            UpdateColorAnimation();
+            highlightColor.a = Mathf.PingPong(Time.time, 1f);
             UpdateMaterialProperties();
         }
     }
 
-    #region Public Methods
-    /// <summary>
-    /// 启动交互效果（颜色+变形）
-    /// </summary>
     public void StartHighlight()
     {
         _isHighlighting = true;
-        ResetToInitialColors();
+        highlightColor = _initialColor;
+        intensity = _initialIntensity;
     }
 
-    /// <summary>
-    /// 停止所有效果并恢复初始状态
-    /// </summary>
     public void StopHighlight()
     {
         _isHighlighting = false;
@@ -65,21 +57,11 @@ public class HighlightController : MonoBehaviour
         UpdateMaterialProperties();
     }
 
-    /// <summary>
-    /// 设置变形参数（独立于颜色控制）
-    /// </summary>
     public void SetDeformation(float depth, float hardness)
     {
-        deformationDepth = Mathf.Clamp(depth, 0, 0.3f);
+        deformationDepth = Mathf.Clamp(depth, 0f, 0.3f);
         deformationHardness = Mathf.Clamp(hardness, 0.1f, 5f);
         UpdateMaterialProperties();
-    }
-    #endregion
-
-    #region Private Methods
-    private void InitializeMaterial()
-    {
-        _material = GetComponent<Renderer>().materials[0];
     }
 
     private void SaveInitialStates()
@@ -90,17 +72,6 @@ public class HighlightController : MonoBehaviour
         _initialSmoothness = smoothness;
         _initialDeformationDepth = deformationDepth;
         _initialDeformationHardness = deformationHardness;
-    }
-
-    private void UpdateColorAnimation()
-    {
-        highlightColor.a = Mathf.PingPong(Time.time, 1f);
-    }
-
-    private void ResetToInitialColors()
-    {
-        highlightColor = _initialColor;
-        intensity = _initialIntensity;
     }
 
     private void ResetAllParameters()
@@ -115,18 +86,14 @@ public class HighlightController : MonoBehaviour
 
     private void UpdateMaterialProperties()
     {
-        // 颜色相关参数
         _material.SetVector("_HighlightCenter", highlightCenter.position);
         _material.SetColor("_HighlightColor", highlightColor);
         _material.SetFloat("_HighlightRadius", highlightRadius);
-        _material.SetFloat("_HighlightIntensity", intensity);
+        _material.SetFloat("_ColorIntensity", intensity);   // matches shader property _ColorIntensity
         _material.SetFloat("_EdgeSmoothness", smoothness);
-
-        // 变形相关参数
         _material.SetFloat("_DeformationDepth", deformationDepth);
         _material.SetFloat("_DeformationHardness", deformationHardness);
     }
-    #endregion
 
     void OnDestroy()
     {
